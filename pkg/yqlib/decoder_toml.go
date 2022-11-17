@@ -29,6 +29,10 @@ func (dec *tomlDecoder) Init(reader io.Reader) error {
 	return nil
 }
 
+func (dec *tomlDecoder) getFullPath(toml.Node *toml.Node) ([]string, error){
+	
+}
+
 func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, error) {
 
 	value := tomlNode.Value()

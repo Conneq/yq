@@ -6,6 +6,11 @@ import (
 	"github.com/mikefarah/yq/v4/test"
 )
 
+var sample = `
+[owner]
+name = "Tom Preston-Werner"
+`
+
 var tomlScenarios = []formatScenario{
 	{
 		skipDoc:      true,
@@ -24,6 +29,12 @@ var tomlScenarios = []formatScenario{
 	{
 		description:  "Simple",
 		input:        `A = "hello"`,
+		expected:     "A: hello\n",
+		scenarioType: "decode",
+	},
+	{
+		description:  "Simple",
+		input:        `A.B = "hello"`,
 		expected:     "A: hello\n",
 		scenarioType: "decode",
 	},
@@ -84,6 +95,12 @@ var tomlScenarios = []formatScenario{
 		expected:     "name:\n  first: Tom\n  last: Preston-Werner\n",
 		scenarioType: "decode",
 	},
+	// {
+	// 	skipDoc:      true,
+	// 	input:        sample,
+	// 	expected:     "",
+	// 	scenarioType: "decode",
+	// },
 }
 
 func testTomlScenario(t *testing.T, s formatScenario) {
