@@ -45,7 +45,51 @@ func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, erro
 
 	return &yaml.Node{
 		Kind:    yaml.MappingNode,
+		Tag:     "!!map",
 		Content: []*yaml.Node{keyNode, valueNode},
+	}, nil
+}
+
+func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, error) {
+	content := make([]*yaml.Node, 0)
+
+	iterator := tomlNode.Children()
+	for iterator.Next() {
+		child := iterator.Node()
+		if child.Kind != toml.KeyValue {
+			return nil, fmt.Errorf("only keyvalue pairs are supported in inlinetables, got %v instead", child.Kind)
+		}
+
+		keyValues, err := dec.createKeyValueMap(child)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, keyValues.Content...)
+	}
+
+	return &yaml.Node{
+		Kind:    yaml.MappingNode,
+		Tag:     "!!map",
+		Content: content,
+	}, nil
+}
+
+func (dec *tomlDecoder) createArray(tomlNode *toml.Node) (*yaml.Node, error) {
+	content := make([]*yaml.Node, 0)
+	iterator := tomlNode.Children()
+	for iterator.Next() {
+		child := iterator.Node()
+		yamlNode, err := dec.convertToYamlNode(child)
+		if err != nil {
+			return nil, err
+		}
+		content = append(content, yamlNode)
+	}
+
+	return &yaml.Node{
+		Kind:    yaml.SequenceNode,
+		Tag:     "!!seq",
+		Content: content,
 	}, nil
 
 }
@@ -84,6 +128,10 @@ func (dec *tomlDecoder) convertToYamlNode(tomlNode *toml.Node) (*yaml.Node, erro
 		return dec.createIntegerScalar(tomlNode)
 	case toml.Float:
 		return dec.createFloatScalar(tomlNode)
+	case toml.Array:
+		return dec.createArray(tomlNode)
+	case toml.InlineTable:
+		return dec.createInlineTableMap(tomlNode)
 	default:
 		return nil, fmt.Errorf("unsupported type %v", tomlNode.Kind)
 	}

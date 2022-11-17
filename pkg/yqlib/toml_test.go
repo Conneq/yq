@@ -59,8 +59,29 @@ var tomlScenarios = []formatScenario{
 	{
 		skipDoc:      true,
 		description:  "float",
-		input:        `A = -3.23 `,
-		expected:     "A: -3.23\n",
+		input:        `A = 6.626e-34`,
+		expected:     "A: 6.626e-34\n",
+		scenarioType: "decode",
+	},
+	{
+		skipDoc:      true,
+		description:  "empty arraY",
+		input:        `A = []`,
+		expected:     "A: []\n",
+		scenarioType: "decode",
+	},
+	{
+		skipDoc:      true,
+		description:  "array",
+		input:        `A = ["hello", ["world", "again"]]`,
+		expected:     "A:\n  - hello\n  - - world\n    - again\n",
+		scenarioType: "decode",
+	},
+	{
+		skipDoc:      true,
+		description:  "inline table",
+		input:        `name = { first = "Tom", last = "Preston-Werner" }`,
+		expected:     "name:\n  first: Tom\n  last: Preston-Werner\n",
 		scenarioType: "decode",
 	},
 }
@@ -68,9 +89,9 @@ var tomlScenarios = []formatScenario{
 func testTomlScenario(t *testing.T, s formatScenario) {
 	switch s.scenarioType {
 	case "", "decode":
-		test.AssertResultWithContext(t, s.expected, mustProcessFormatScenario(s, NewTomlDecoder(), NewYamlEncoder(4, false, ConfiguredYamlPreferences)), s.description)
+		test.AssertResultWithContext(t, s.expected, mustProcessFormatScenario(s, NewTomlDecoder(), NewYamlEncoder(2, false, ConfiguredYamlPreferences)), s.description)
 	case "decode-error":
-		result, err := processFormatScenario(s, NewTomlDecoder(), NewYamlEncoder(4, false, ConfiguredYamlPreferences))
+		result, err := processFormatScenario(s, NewTomlDecoder(), NewYamlEncoder(2, false, ConfiguredYamlPreferences))
 		if err == nil {
 			t.Errorf("Expected error '%v' but it worked: %v", s.expectedError, result)
 		} else {
