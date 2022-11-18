@@ -13,11 +13,13 @@ import (
 type tomlDecoder struct {
 	parser   toml.Parser
 	finished bool
+	d        DataTreeNavigator
 }
 
 func NewTomlDecoder() Decoder {
 	return &tomlDecoder{
 		finished: false,
+		d:        NewDataTreeNavigator(),
 	}
 }
 
@@ -29,29 +31,45 @@ func (dec *tomlDecoder) Init(reader io.Reader) error {
 	return nil
 }
 
-func (dec *tomlDecoder) getFullPath(toml.Node *toml.Node) ([]string, error){
-	
+func (dec *tomlDecoder) getFullPath(tomlNode *toml.Node) ([]interface{}, error) {
+	path := make([]interface{}, 0)
+	for {
+		path = append(path, string(tomlNode.Data))
+		tomlNode = tomlNode.Next()
+		if tomlNode == nil {
+			return path, nil
+		}
+	}
 }
 
 func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, error) {
 
 	value := tomlNode.Value()
-	key := value.Next()
-
-	keyNode, err := dec.convertToYamlNode(key)
+	path, err := dec.getFullPath(value.Next())
 	if err != nil {
 		return nil, err
 	}
+
+	rootMap := &CandidateNode{
+		Node: &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+		},
+	}
+
 	valueNode, err := dec.convertToYamlNode(value)
 	if err != nil {
 		return nil, err
 	}
+	context := Context{}
+	context = context.SingleChildContext(rootMap)
 
-	return &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Tag:     "!!map",
-		Content: []*yaml.Node{keyNode, valueNode},
-	}, nil
+	err = dec.d.DeeplyAssign(context, path, valueNode)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootMap.Node, nil
 }
 
 func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, error) {

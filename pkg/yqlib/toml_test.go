@@ -33,9 +33,9 @@ var tomlScenarios = []formatScenario{
 		scenarioType: "decode",
 	},
 	{
-		description:  "Simple",
+		description:  "Simpl nested",
 		input:        `A.B = "hello"`,
-		expected:     "A: hello\n",
+		expected:     "A:\n  B: hello\n",
 		scenarioType: "decode",
 	},
 	{
