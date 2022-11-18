@@ -72,6 +72,21 @@ func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, erro
 	return rootMap.Node, nil
 }
 
+func (dec *tomlDecoder) createTable(tomlNode *toml.Node) (*yaml.Node, error) {
+	log.Debug("Table: %v", string(tomlNode.Data))
+	iterator := tomlNode.Children()
+	for iterator.Next() {
+		child := iterator.Node()
+		log.Debug("child: %v, %v", string(child.Data), child.Kind)
+
+	}
+
+	return &yaml.Node{
+		Kind: yaml.MappingNode,
+		Tag:  "!!map",
+	}, nil
+}
+
 func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, error) {
 	content := make([]*yaml.Node, 0)
 
@@ -154,6 +169,8 @@ func (dec *tomlDecoder) convertToYamlNode(tomlNode *toml.Node) (*yaml.Node, erro
 		return dec.createArray(tomlNode)
 	case toml.InlineTable:
 		return dec.createInlineTableMap(tomlNode)
+	case toml.Table:
+		return dec.createTable(tomlNode)
 	default:
 		return nil, fmt.Errorf("unsupported type %v", tomlNode.Kind)
 	}
