@@ -6,9 +6,16 @@ import (
 	"github.com/mikefarah/yq/v4/test"
 )
 
-var sample = `
-[owner]
+var sampleTable = `
+[owner.contact]
 name = "Tom Preston-Werner"
+age = 36
+`
+
+var sampleTableExpected = `owner:
+  contact:
+    name: Tom Preston-Werner
+    age: 36
 `
 
 var tomlScenarios = []formatScenario{
@@ -26,10 +33,16 @@ var tomlScenarios = []formatScenario{
 	// 	expectedError: `bad file 'sample.yml': basic string not terminated by "`,
 	// 	scenarioType:  "decode-error",
 	// },
+	{
+		description:  "Simple",
+		input:        "A = \"hello\"\nB = 12\n",
+		expected:     "A: hello\nB: 12\n",
+		scenarioType: "decode",
+	},
 	// {
-	// 	description:  "Simple",
-	// 	input:        `A = "hello"`,
-	// 	expected:     "A: hello\n",
+	// 	description:  "Deep paths",
+	// 	input:        "person.name = \"hello\"\nperson.address = \"12 cat st\"\n",
+	// 	expected:     "person:\n  name: hello\n  address: 12 cat st\n",
 	// 	scenarioType: "decode",
 	// },
 	// {
@@ -97,8 +110,8 @@ var tomlScenarios = []formatScenario{
 	// },
 	{
 		skipDoc:      true,
-		input:        sample,
-		expected:     "",
+		input:        sampleTable,
+		expected:     sampleTableExpected,
 		scenarioType: "decode",
 	},
 }

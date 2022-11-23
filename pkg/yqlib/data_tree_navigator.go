@@ -23,7 +23,7 @@ func NewDataTreeNavigator() DataTreeNavigator {
 	return &dataTreeNavigator{}
 }
 
-func (dec *dataTreeNavigator) DeeplyAssign(context Context, path []interface{}, rhsNode *yaml.Node) error {
+func (d *dataTreeNavigator) DeeplyAssign(context Context, path []interface{}, rhsNode *yaml.Node) error {
 
 	rhsCandidateNode := &CandidateNode{
 		Path: path,
@@ -40,7 +40,7 @@ func (dec *dataTreeNavigator) DeeplyAssign(context Context, path []interface{}, 
 		RHS:       &ExpressionNode{Operation: rhsOp},
 	}
 
-	_, err := dec.GetMatchingNodes(context, assignmentOpNode)
+	_, err := d.GetMatchingNodes(context, assignmentOpNode)
 	return err
 }
 
