@@ -7,6 +7,8 @@ import (
 )
 
 var sampleTable = `
+var = "x"
+
 [owner.contact]
 name = "Tom Preston-Werner"
 age = 36
@@ -33,12 +35,12 @@ var tomlScenarios = []formatScenario{
 	// 	expectedError: `bad file 'sample.yml': basic string not terminated by "`,
 	// 	scenarioType:  "decode-error",
 	// },
-	{
-		description:  "Simple",
-		input:        "A = \"hello\"\nB = 12\n",
-		expected:     "A: hello\nB: 12\n",
-		scenarioType: "decode",
-	},
+	// {
+	// 	description:  "Simple",
+	// 	input:        "A = \"hello\"\nB = 12\n",
+	// 	expected:     "A: hello\nB: 12\n",
+	// 	scenarioType: "decode",
+	// },
 	// {
 	// 	description:  "Deep paths",
 	// 	input:        "person.name = \"hello\"\nperson.address = \"12 cat st\"\n",

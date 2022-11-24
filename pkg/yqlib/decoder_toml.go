@@ -2,6 +2,7 @@ package yqlib
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -59,6 +60,33 @@ func (dec *tomlDecoder) processKeyValueIntoMap(rootMap *CandidateNode, tomlNode 
 	return dec.d.DeeplyAssign(context, path, valueNode)
 }
 
+func (dec *tomlDecoder) decodeKeyValuesIntoMap(rootMap *CandidateNode, tomlNode *toml.Node) error {
+	log.Debug("!! DECODE_KV_INTO_MAP -- processing first (current) entry")
+	if err := dec.processKeyValueIntoMap(rootMap, tomlNode); err != nil {
+		return err
+	}
+
+	for dec.parser.NextExpression() {
+		nextItem := dec.parser.Expression()
+		log.Debug("!! DECODE_KV_INTO_MAP -- next exp, its a %v", nextItem.Kind)
+
+		if nextItem.Kind == toml.KeyValue {
+			if err := dec.processKeyValueIntoMap(rootMap, nextItem); err != nil {
+				return err
+			}
+		} else {
+			// run out of key values
+			log.Debug("! DECODE_KV_INTO_MAP - ok we are done in decodeKeyValuesIntoMap, gota a %v", nextItem.Kind)
+			return nil
+		}
+	}
+	log.Debug("! DECODE_KV_INTO_MAP - no more things to read in %w", dec.parser.Error())
+	if dec.parser.Error() != nil {
+		return dec.parser.Error()
+	}
+	return io.EOF
+}
+
 func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, error) {
 
 	rootMap := &CandidateNode{
@@ -67,25 +95,9 @@ func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, erro
 			Tag:  "!!map",
 		},
 	}
-	log.Debug("!! createKeyValueMap -- processing first (current) entry")
-	if err := dec.processKeyValueIntoMap(rootMap, tomlNode); err != nil {
-		return nil, err
-	}
-
-	for dec.parser.NextExpression() {
-		nextItem := dec.parser.Expression()
-		log.Debug("!! createKeyValueMap -- next exp, its a %v", nextItem.Kind)
-
-		if nextItem.Kind == toml.KeyValue {
-			if err := dec.processKeyValueIntoMap(rootMap, nextItem); err != nil {
-				return nil, err
-			}
-		} else {
-			// run out of key values
-			return rootMap.Node, nil
-		}
-	}
-	return rootMap.Node, dec.parser.Error()
+	err := dec.decodeKeyValuesIntoMap(rootMap, tomlNode)
+	log.Debug("! createKeyValueMap done, %v ", NodeToString(rootMap))
+	return rootMap.Node, err
 }
 
 func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, error) {
@@ -193,21 +205,25 @@ func (dec *tomlDecoder) Decode() (*CandidateNode, error) {
 		}
 	}()
 
-	content := make([]*yaml.Node, 0)
 	log.Debug("ok here we go")
+	newMap := &CandidateNode{
+		Node: &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+		}}
 
 	var currentNode *toml.Node = nil
 
-	// log.Debugf("currentNode != dec.parser.Expression(): %v", currentNode != dec.parser.Expression())
-
 	for (currentNode != nil && currentNode != dec.parser.Expression()) || dec.parser.NextExpression() {
-		log.Debug("NextExpression")
 
-		tomlNode := dec.parser.Expression()
+		currentNode = dec.parser.Expression()
 
-		if tomlNode.Kind == toml.Table {
-			fullPath := dec.getFullPath(tomlNode.Child())
-			log.Debug("fullpath: %v", fullPath)
+		log.Debug("currentNode: %v ", currentNode.Kind)
+
+		if currentNode.Kind == toml.Table {
+			log.Debug("!!! processing table")
+			fullPath := dec.getFullPath(currentNode.Child())
+			log.Debug("!!!fullpath: %v", fullPath)
 
 			hasValue := dec.parser.NextExpression() // get the value of the table
 			if !hasValue {
@@ -223,31 +239,25 @@ func (dec *tomlDecoder) Decode() (*CandidateNode, error) {
 			}
 			log.Debugf("table node %v", tableNodeValue.Tag)
 			c := Context{}
-			newMap := &yaml.Node{
-				Kind: yaml.MappingNode,
-				Tag:  "!!map",
-			}
-			c = c.SingleChildContext(&CandidateNode{
-				Node: newMap,
-			})
+
+			c = c.SingleChildContext(newMap)
 			err = dec.d.DeeplyAssign(c, fullPath, tableNodeValue)
 			if err != nil {
 				return nil, err
 			}
-			content = append(content, newMap)
 
 		} else {
 
-			yamlNode, err := dec.decodeNode(tomlNode)
-
-			log.Debugf("err: %w", err)
+			err := dec.decodeKeyValuesIntoMap(newMap, currentNode)
+			log.Debug("TOP LEVEL KV DONE %v", NodeToString(newMap))
+			if errors.Is(err, io.EOF) {
+				break
+			}
 			if err != nil {
-				log.Debugf("badness", err)
+				log.Debug("wait waht")
 				return nil, err
 			}
-			log.Debugf("carry on, got %v", yamlNode)
-			content = append(content, yamlNode)
-			log.Debug("appended", yamlNode.Tag)
+			log.Debug("next exp %v vs %v", currentNode, dec.parser.Expression())
 		}
 	}
 
@@ -259,14 +269,14 @@ func (dec *tomlDecoder) Decode() (*CandidateNode, error) {
 	// must have finished
 	dec.finished = true
 
-	if len(content) == 0 {
+	if len(newMap.Node.Content) == 0 {
 		return nil, io.EOF
 	}
 
 	return &CandidateNode{
 		Node: &yaml.Node{
 			Kind:    yaml.DocumentNode,
-			Content: content,
+			Content: []*yaml.Node{newMap.Node},
 		},
 	}, deferredError
 
