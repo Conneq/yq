@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2/unstable"
 	yaml "gopkg.in/yaml.v3"
@@ -160,6 +161,12 @@ func (dec *tomlDecoder) createIntegerScalar(tomlNode *toml.Node) (*yaml.Node, er
 	return createScalarNode(num, content), err
 }
 
+func (dec *tomlDecoder) createDateTimeScalar(tomlNode *toml.Node) (*yaml.Node, error) {
+	content := string(tomlNode.Data)
+	val, err := parseDateTime(time.RFC3339, content)
+	return createScalarNode(val, content), err
+}
+
 func (dec *tomlDecoder) createFloatScalar(tomlNode *toml.Node) (*yaml.Node, error) {
 	content := string(tomlNode.Data)
 	num, err := strconv.ParseFloat(content, 64)
@@ -174,6 +181,8 @@ func (dec *tomlDecoder) decodeNode(tomlNode *toml.Node) (*yaml.Node, error) {
 		return dec.createBoolScalar(tomlNode)
 	case toml.Integer:
 		return dec.createIntegerScalar(tomlNode)
+	case toml.DateTime:
+		return dec.createDateTimeScalar(tomlNode)
 	case toml.Float:
 		return dec.createFloatScalar(tomlNode)
 	case toml.Array:

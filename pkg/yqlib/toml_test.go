@@ -46,12 +46,31 @@ var sampleArrayTableExpected = `owner:
       suburb: nice
 `
 
+var sampleWithHeader = `
+[servers]
+
+[servers.alpha]
+ip = "10.0.0.1"
+`
+
+var expectedSampleWithHeader = `servers:
+  alpha:
+    ip: 10.0.0.1
+`
+
 var tomlScenarios = []formatScenario{
 	{
 		skipDoc:      true,
 		description:  "blank",
 		input:        "",
 		expected:     "",
+		scenarioType: "decode",
+	},
+	{
+		skipDoc:      true,
+		description:  "datetime",
+		input:        "A = 1979-05-27T07:32:00-08:00",
+		expected:     "A: 1979-05-27T07:32:00-08:00",
 		scenarioType: "decode",
 	},
 	{
@@ -146,6 +165,12 @@ var tomlScenarios = []formatScenario{
 		skipDoc:      true,
 		input:        sampleArrayTable,
 		expected:     sampleArrayTableExpected,
+		scenarioType: "decode",
+	},
+	{
+		description:  "example with header",
+		input:        sampleWithHeader,
+		expected:     expectedSampleWithHeader,
 		scenarioType: "decode",
 	},
 }
