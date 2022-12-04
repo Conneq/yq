@@ -247,6 +247,9 @@ func (dec *tomlDecoder) processTopLevelNode(currentNode *toml.Node) error {
 	if currentNode.Kind == toml.Table {
 		log.Debug("TProcessing table into %v", NodeToString(dec.rootMap))
 		return dec.processTable((currentNode))
+	} else if currentNode.Kind == toml.ArrayTable {
+		log.Debug("TProcessing array table into %v", NodeToString(dec.rootMap))
+		return dec.processArrayTable((currentNode))
 	}
 	log.Debug("TProcessing KV into %v", NodeToString(dec.rootMap))
 	return dec.decodeKeyValuesIntoMap(dec.rootMap, currentNode)
@@ -273,6 +276,63 @@ func (dec *tomlDecoder) processTable(currentNode *toml.Node) error {
 
 	c = c.SingleChildContext(dec.rootMap)
 	err = dec.d.DeeplyAssign(c, fullPath, tableNodeValue)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (dec *tomlDecoder) arrayAppend(context Context, path []interface{}, rhsNode *yaml.Node) error {
+	rhsCandidateNode := &CandidateNode{
+		Path: path,
+		Node: &yaml.Node{
+			Kind:    yaml.SequenceNode,
+			Tag:     "!!seq",
+			Content: []*yaml.Node{rhsNode},
+		},
+	}
+
+	assignmentOp := &Operation{OperationType: addAssignOpType}
+
+	rhsOp := &Operation{OperationType: valueOpType, CandidateNode: rhsCandidateNode}
+
+	assignmentOpNode := &ExpressionNode{
+		Operation: assignmentOp,
+		LHS:       createTraversalTree(path, traversePreferences{}, false),
+		RHS:       &ExpressionNode{Operation: rhsOp},
+	}
+
+	_, err := dec.d.GetMatchingNodes(context, assignmentOpNode)
+	return err
+}
+
+func (dec *tomlDecoder) processArrayTable(currentNode *toml.Node) error {
+	log.Debug("!!! processing table")
+	fullPath := dec.getFullPath(currentNode.Child())
+	log.Debug("!!!fullpath: %v", fullPath)
+
+	// need to use the array append exp to add another entry to
+	// this array: fullpath += [ thing ]
+
+	hasValue := dec.parser.NextExpression()
+	if !hasValue {
+		return fmt.Errorf("error retrieving table %v value: %w", fullPath, dec.parser.Error())
+	}
+
+	tableValue := dec.parser.Expression()
+	tableNodeValue, err := dec.decodeNode(tableValue)
+	log.Debugf("table node err: %w", err)
+	if err != nil && !errors.Is(io.EOF, err) {
+		return err
+	}
+	log.Debugf("table node %v", tableNodeValue.Tag)
+	c := Context{}
+
+	c = c.SingleChildContext(dec.rootMap)
+
+	// += function
+	err = dec.arrayAppend(c, fullPath, tableNodeValue)
+
 	if err != nil {
 		return err
 	}

@@ -21,100 +21,131 @@ owner:
     age: 36
 `
 
+var sampleArrayTable = `
+[owner.contact]
+name = "Tom Preston-Werner"
+age = 36
+
+[[owner.addresses]]
+street = "first street"
+suburb = "ok"
+
+[[owner.addresses]]
+street = "second street"
+suburb = "nice"
+`
+
+var sampleArrayTableExpected = `owner:
+  contact:
+    name: Tom Preston-Werner
+    age: 36
+  addresses:
+    - street: first street
+      suburb: ok
+    - street: second street
+      suburb: nice
+`
+
 var tomlScenarios = []formatScenario{
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "blank",
+	// 	input:        "",
+	// 	expected:     "",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:       true,
+	// 	description:   "blank",
+	// 	input:         `A = "hello`,
+	// 	expectedError: `bad file 'sample.yml': basic string not terminated by "`,
+	// 	scenarioType:  "decode-error",
+	// },
+	// {
+	// 	description:  "Simple",
+	// 	input:        "A = \"hello\"\nB = 12\n",
+	// 	expected:     "A: hello\nB: 12\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	description:  "Deep paths",
+	// 	input:        "person.name = \"hello\"\nperson.address = \"12 cat st\"\n",
+	// 	expected:     "person:\n  name: hello\n  address: 12 cat st\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	description:  "Simpl nested",
+	// 	input:        `A.B = "hello"`,
+	// 	expected:     "A:\n  B: hello\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "bool",
+	// 	input:        `A = true`,
+	// 	expected:     "A: true\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "bool false",
+	// 	input:        `A = false `,
+	// 	expected:     "A: false\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "number",
+	// 	input:        `A = 3 `,
+	// 	expected:     "A: 3\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "number",
+	// 	input:        `A = 0xDEADBEEF`,
+	// 	expression:   " .A += 1",
+	// 	expected:     "A: 0xDEADBEF0\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "float",
+	// 	input:        `A = 6.626e-34`,
+	// 	expected:     "A: 6.626e-34\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "empty arraY",
+	// 	input:        `A = []`,
+	// 	expected:     "A: []\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "array",
+	// 	input:        `A = ["hello", ["world", "again"]]`,
+	// 	expected:     "A:\n  - hello\n  - - world\n    - again\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	description:  "inline table",
+	// 	input:        `name = { first = "Tom", last = "Preston-Werner" }`,
+	// 	expected:     "name:\n  first: Tom\n  last: Preston-Werner\n",
+	// 	scenarioType: "decode",
+	// },
+	// {
+	// 	skipDoc:      true,
+	// 	input:        sampleTable,
+	// 	expected:     sampleTableExpected,
+	// 	scenarioType: "decode",
+	// },
 	{
 		skipDoc:      true,
-		description:  "blank",
-		input:        "",
-		expected:     "",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:       true,
-		description:   "blank",
-		input:         `A = "hello`,
-		expectedError: `bad file 'sample.yml': basic string not terminated by "`,
-		scenarioType:  "decode-error",
-	},
-	{
-		description:  "Simple",
-		input:        "A = \"hello\"\nB = 12\n",
-		expected:     "A: hello\nB: 12\n",
-		scenarioType: "decode",
-	},
-	{
-		description:  "Deep paths",
-		input:        "person.name = \"hello\"\nperson.address = \"12 cat st\"\n",
-		expected:     "person:\n  name: hello\n  address: 12 cat st\n",
-		scenarioType: "decode",
-	},
-	{
-		description:  "Simpl nested",
-		input:        `A.B = "hello"`,
-		expected:     "A:\n  B: hello\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "bool",
-		input:        `A = true`,
-		expected:     "A: true\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "bool false",
-		input:        `A = false `,
-		expected:     "A: false\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "number",
-		input:        `A = 3 `,
-		expected:     "A: 3\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "number",
-		input:        `A = 0xDEADBEEF`,
-		expression:   " .A += 1",
-		expected:     "A: 0xDEADBEF0\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "float",
-		input:        `A = 6.626e-34`,
-		expected:     "A: 6.626e-34\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "empty arraY",
-		input:        `A = []`,
-		expected:     "A: []\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "array",
-		input:        `A = ["hello", ["world", "again"]]`,
-		expected:     "A:\n  - hello\n  - - world\n    - again\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		description:  "inline table",
-		input:        `name = { first = "Tom", last = "Preston-Werner" }`,
-		expected:     "name:\n  first: Tom\n  last: Preston-Werner\n",
-		scenarioType: "decode",
-	},
-	{
-		skipDoc:      true,
-		input:        sampleTable,
-		expected:     sampleTableExpected,
+		input:        sampleArrayTable,
+		expected:     sampleArrayTableExpected,
 		scenarioType: "decode",
 	},
 }
