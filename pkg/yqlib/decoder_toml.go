@@ -55,6 +55,7 @@ func (dec *tomlDecoder) getFullPath(tomlNode *toml.Node) []interface{} {
 func (dec *tomlDecoder) processKeyValueIntoMap(rootMap *CandidateNode, tomlNode *toml.Node) error {
 	value := tomlNode.Value()
 	path := dec.getFullPath(value.Next())
+	log.Debug("!!!processKeyValueIntoMap: %v", path)
 
 	valueNode, err := dec.decodeNode(value)
 	if err != nil {
@@ -66,10 +67,10 @@ func (dec *tomlDecoder) processKeyValueIntoMap(rootMap *CandidateNode, tomlNode 
 	return dec.d.DeeplyAssign(context, path, valueNode)
 }
 
-func (dec *tomlDecoder) decodeKeyValuesIntoMap(rootMap *CandidateNode, tomlNode *toml.Node) error {
+func (dec *tomlDecoder) decodeKeyValuesIntoMap(rootMap *CandidateNode, tomlNode *toml.Node) (bool, error) {
 	log.Debug("!! DECODE_KV_INTO_MAP -- processing first (current) entry")
 	if err := dec.processKeyValueIntoMap(rootMap, tomlNode); err != nil {
-		return err
+		return false, err
 	}
 
 	for dec.parser.NextExpression() {
@@ -78,33 +79,22 @@ func (dec *tomlDecoder) decodeKeyValuesIntoMap(rootMap *CandidateNode, tomlNode 
 
 		if nextItem.Kind == toml.KeyValue {
 			if err := dec.processKeyValueIntoMap(rootMap, nextItem); err != nil {
-				return err
+				return false, err
 			}
 		} else {
 			// run out of key values
 			log.Debug("! DECODE_KV_INTO_MAP - ok we are done in decodeKeyValuesIntoMap, gota a %v", nextItem.Kind)
-			return dec.processTopLevelNode(nextItem)
+			log.Debug("! DECODE_KV_INTO_MAP - processAgainstCurrentExp = true!")
+			return true, nil
 		}
 	}
 	log.Debug("! DECODE_KV_INTO_MAP - no more things to read in")
-	return nil
-}
-
-func (dec *tomlDecoder) createKeyValueMap(tomlNode *toml.Node) (*yaml.Node, error) {
-
-	rootMap := &CandidateNode{
-		Node: &yaml.Node{
-			Kind: yaml.MappingNode,
-			Tag:  "!!map",
-		},
-	}
-	err := dec.decodeKeyValuesIntoMap(rootMap, tomlNode)
-	log.Debug("! createKeyValueMap done, %v ", NodeToString(rootMap))
-	return rootMap.Node, err
+	return false, nil
 }
 
 func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, error) {
 	content := make([]*yaml.Node, 0)
+	log.Debug("!! createInlineTableMap")
 
 	iterator := tomlNode.Children()
 	for iterator.Next() {
@@ -113,11 +103,18 @@ func (dec *tomlDecoder) createInlineTableMap(tomlNode *toml.Node) (*yaml.Node, e
 			return nil, fmt.Errorf("only keyvalue pairs are supported in inlinetables, got %v instead", child.Kind)
 		}
 
-		keyValues, err := dec.createKeyValueMap(child)
-		if err != nil {
+		keyValues := &CandidateNode{
+			Node: &yaml.Node{
+				Kind: yaml.MappingNode,
+				Tag:  "!!map",
+			},
+		}
+
+		if err := dec.processKeyValueIntoMap(keyValues, child); err != nil {
 			return nil, err
 		}
-		content = append(content, keyValues.Content...)
+
+		content = append(content, keyValues.Node.Content...)
 	}
 
 	return &yaml.Node{
@@ -171,8 +168,6 @@ func (dec *tomlDecoder) createFloatScalar(tomlNode *toml.Node) (*yaml.Node, erro
 
 func (dec *tomlDecoder) decodeNode(tomlNode *toml.Node) (*yaml.Node, error) {
 	switch tomlNode.Kind {
-	case toml.KeyValue:
-		return dec.createKeyValueMap(tomlNode)
 	case toml.Key, toml.String:
 		return dec.createStringScalar(tomlNode)
 	case toml.Bool:
@@ -209,20 +204,25 @@ func (dec *tomlDecoder) Decode() (*CandidateNode, error) {
 	}()
 
 	log.Debug("ok here we go")
+	var runAgainstCurrentExp = false
+	var err error
+	for runAgainstCurrentExp || dec.parser.NextExpression() {
 
-	for dec.parser.NextExpression() {
+		if runAgainstCurrentExp {
+			log.Debug("running against current exp")
+		}
 
 		currentNode := dec.parser.Expression()
 
 		log.Debug("currentNode: %v ", currentNode.Kind)
-		err := dec.processTopLevelNode(currentNode)
+		runAgainstCurrentExp, err = dec.processTopLevelNode(currentNode)
 		if err != nil {
 			return dec.rootMap, err
 		}
 
 	}
 
-	err := dec.parser.Error()
+	err = dec.parser.Error()
 	if err != nil {
 		return nil, err
 	}
@@ -243,43 +243,53 @@ func (dec *tomlDecoder) Decode() (*CandidateNode, error) {
 
 }
 
-func (dec *tomlDecoder) processTopLevelNode(currentNode *toml.Node) error {
+func (dec *tomlDecoder) processTopLevelNode(currentNode *toml.Node) (bool, error) {
+	var runAgainstCurrentExp bool
+	var err error
+	log.Debug("!!!!!!!!!!!!Going to process %v state is current %v", currentNode.Kind, NodeToString(dec.rootMap))
 	if currentNode.Kind == toml.Table {
-		log.Debug("TProcessing table into %v", NodeToString(dec.rootMap))
-		return dec.processTable((currentNode))
+		runAgainstCurrentExp, err = dec.processTable((currentNode))
 	} else if currentNode.Kind == toml.ArrayTable {
-		log.Debug("TProcessing array table into %v", NodeToString(dec.rootMap))
-		return dec.processArrayTable((currentNode))
+		runAgainstCurrentExp, err = dec.processArrayTable((currentNode))
+	} else {
+		runAgainstCurrentExp, err = dec.decodeKeyValuesIntoMap(dec.rootMap, currentNode)
 	}
-	log.Debug("TProcessing KV into %v", NodeToString(dec.rootMap))
-	return dec.decodeKeyValuesIntoMap(dec.rootMap, currentNode)
+
+	log.Debug("!!!!!!!!!!!!DONE Processing state is now %v", NodeToString(dec.rootMap))
+	return runAgainstCurrentExp, err
 }
 
-func (dec *tomlDecoder) processTable(currentNode *toml.Node) error {
+func (dec *tomlDecoder) processTable(currentNode *toml.Node) (bool, error) {
 	log.Debug("!!! processing table")
 	fullPath := dec.getFullPath(currentNode.Child())
 	log.Debug("!!!fullpath: %v", fullPath)
 
 	hasValue := dec.parser.NextExpression()
 	if !hasValue {
-		return fmt.Errorf("error retrieving table %v value: %w", fullPath, dec.parser.Error())
+		return false, fmt.Errorf("error retrieving table %v value: %w", fullPath, dec.parser.Error())
+	}
+
+	tableNodeValue := &CandidateNode{
+		Node: &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+		},
 	}
 
 	tableValue := dec.parser.Expression()
-	tableNodeValue, err := dec.decodeNode(tableValue)
+	runAgainstCurrentExp, err := dec.decodeKeyValuesIntoMap(tableNodeValue, tableValue)
 	log.Debugf("table node err: %w", err)
 	if err != nil && !errors.Is(io.EOF, err) {
-		return err
+		return false, err
 	}
-	log.Debugf("table node %v", tableNodeValue.Tag)
 	c := Context{}
 
 	c = c.SingleChildContext(dec.rootMap)
-	err = dec.d.DeeplyAssign(c, fullPath, tableNodeValue)
+	err = dec.d.DeeplyAssign(c, fullPath, tableNodeValue.Node)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return runAgainstCurrentExp, nil
 }
 
 func (dec *tomlDecoder) arrayAppend(context Context, path []interface{}, rhsNode *yaml.Node) error {
@@ -306,7 +316,7 @@ func (dec *tomlDecoder) arrayAppend(context Context, path []interface{}, rhsNode
 	return err
 }
 
-func (dec *tomlDecoder) processArrayTable(currentNode *toml.Node) error {
+func (dec *tomlDecoder) processArrayTable(currentNode *toml.Node) (bool, error) {
 	log.Debug("!!! processing table")
 	fullPath := dec.getFullPath(currentNode.Child())
 	log.Debug("!!!fullpath: %v", fullPath)
@@ -316,25 +326,28 @@ func (dec *tomlDecoder) processArrayTable(currentNode *toml.Node) error {
 
 	hasValue := dec.parser.NextExpression()
 	if !hasValue {
-		return fmt.Errorf("error retrieving table %v value: %w", fullPath, dec.parser.Error())
+		return false, fmt.Errorf("error retrieving table %v value: %w", fullPath, dec.parser.Error())
+	}
+
+	tableNodeValue := &CandidateNode{
+		Node: &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+		},
 	}
 
 	tableValue := dec.parser.Expression()
-	tableNodeValue, err := dec.decodeNode(tableValue)
+	runAgainstCurrentExp, err := dec.decodeKeyValuesIntoMap(tableNodeValue, tableValue)
 	log.Debugf("table node err: %w", err)
 	if err != nil && !errors.Is(io.EOF, err) {
-		return err
+		return false, err
 	}
-	log.Debugf("table node %v", tableNodeValue.Tag)
 	c := Context{}
 
 	c = c.SingleChildContext(dec.rootMap)
 
 	// += function
-	err = dec.arrayAppend(c, fullPath, tableNodeValue)
+	err = dec.arrayAppend(c, fullPath, tableNodeValue.Node)
 
-	if err != nil {
-		return err
-	}
-	return nil
+	return runAgainstCurrentExp, err
 }
